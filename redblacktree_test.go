@@ -18,7 +18,6 @@ License.
 package redblacktree
 
 import (
-    "fmt"
     "reflect"
     "testing"
 )
@@ -49,8 +48,26 @@ func init() {
         "put": put,
     }
 
-    TraceOff()
-    fmt.Println("done .. redblacktree_test.init")
+    //TraceOff()
+    TraceOn()
+}
+
+func True(b bool, t *testing.T) {
+	if !b {
+		t.Errorf("Expected [ %t ] got [ %t ]", true, b)
+	}
+}
+
+func False(b bool, t *testing.T) {
+	if b {
+		t.Errorf("Expected [ %t ] got [ %t ]", false, b)
+	}
+}
+
+func assertDirection(expected Direction, actual Direction, t *testing.T) {
+    if actual != expected {
+		t.Errorf("Expected (%s) got (%s)", expected, actual)
+	}
 }
 
 // using the inorder walk of the tree for equality
@@ -62,25 +79,60 @@ func assertEqualTree(tr *Tree, t *testing.T, expected string) {
     }
 }
 
+// Value.IsNil returns true if v is a nil value. It panics if 
+// v's Kind is not Chan, Func, Interface, Map, Ptr, or Slice.
+func nillable(k reflect.Kind) bool {
+    switch k {
+    case reflect.Chan: fallthrough
+    case reflect.Func: fallthrough
+    case reflect.Interface: fallthrough
+    case reflect.Map: fallthrough
+    case reflect.Ptr: fallthrough
+    case reflect.Slice: return true
+    default: return false
+    }
+}
+
+// asserts that @param `a` is nil
+func Nil(a interface{}, t *testing.T) {
+    if a == nil {
+        return
+    }
+    value := reflect.ValueOf(a)
+    if nillable(value.Kind()) {
+        if !value.IsNil() {
+			t.Errorf("%#v is not nil", a)
+		}
+    } else {
+        t.Errorf("%#v is not nil", a)
+	}
+}
+
+// asserts that @param `a` is NOT nil
+func NotNil(a interface{}, t *testing.T) {
+    if a == nil {
+        t.Errorf("Expected NOT nil")
+        return
+    }
+    value := reflect.ValueOf(a)
+    if nillable(value.Kind()) {
+        if value.IsNil() {
+			t.Errorf("%#v is nil but we expected it to be NOT nil", a)
+		}
+    }
+}
+
 type KV struct {
     key int
     arg string
 }
 
-// @TODO rename to display arity
-// @TODO can I refactor to combine with ToArgs2
-func ToArgs(t *Tree, kv KV) []reflect.Value {
-    in := make([]reflect.Value, 3)
-    in[0] = reflect.ValueOf(t)
-    in[1] = reflect.ValueOf(kv.key)
-    in[2] = reflect.ValueOf(kv.arg)
-    return in
-}
-
-func ToArgs2(t *Tree, arg interface{}) []reflect.Value {
-    in := make([]reflect.Value, 2)
-    in[0] = reflect.ValueOf(t)
-    in[1] = reflect.ValueOf(arg)
+func ToArgs(a ...interface{}) []reflect.Value {
+    in := make([]reflect.Value, len(a))
+    it := make([]struct{}, len(a))
+    for i, _ := range it {
+        in[i] = reflect.ValueOf(a[i])
+    }
     return in
 }
 
@@ -94,9 +146,7 @@ var fixtureSmall = []struct {
     {"put", KV{8, "payload8"}, "((.3.)7(.8.))"},
 }
 
-// depth of tree <= 1
 func TestRedBlackSmall(t *testing.T) {
-    // empty tree
     t1 := NewTree()
     if t1.root != nil {
         t.Errorf("root starts out as nil but got (%t)", t1.root != nil)
@@ -106,7 +156,7 @@ func TestRedBlackSmall(t *testing.T) {
     t2 := NewTree()
     for _, tt := range fixtureSmall {
         method := funcs[tt.ops]
-        in := ToArgs(t2, tt.kv)
+        in := ToArgs(t2, tt.kv.key, tt.kv.arg)
         method.Func.Call(in) // @TODO returns []reflect.Value ?
         assertEqualTree(t2, t, tt.expected)
     }
@@ -126,7 +176,7 @@ func TestRedBlackSimpleRightRotation(t *testing.T) {
     tr := NewTree()
     for _, tt := range fixtureSimpleRightRotation {
         method := funcs[tt.ops]
-        method.Func.Call(ToArgs(tr, tt.kv))
+        method.Func.Call(ToArgs(tr, tt.kv.key, tt.kv.arg))
         assertEqualTree(tr, t, tt.expected)
     }
 }
@@ -147,7 +197,7 @@ func TestRedBlackCase1(t *testing.T) {
     tr := NewTree()
     for _, tt := range fixtureCase1 {
         method := funcs[tt.ops]
-        method.Func.Call(ToArgs(tr, tt.kv))
+        method.Func.Call(ToArgs(tr, tt.kv.key, tt.kv.arg))
         assertEqualTree(tr, t, tt.expected)
     }
 }
@@ -177,10 +227,10 @@ func TestRedBlackLeft(t *testing.T) {
         method := funcs[tt.ops]
         switch {
         case tt.ops == "put":
-            method.Func.Call(ToArgs(t1, tt.kv))
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
 
         case tt.ops == "rotateLeft":
-            method.Func.Call(ToArgs2(t1, t1.root))
+            method.Func.Call(ToArgs(t1, t1.root))
         }
         assertEqualTree(t1, t, tt.expected)
     }
@@ -211,11 +261,80 @@ func TestRedBlackRight(t *testing.T) {
         method := funcs[tt.ops]
         switch {
         case tt.ops == "put":
-            method.Func.Call(ToArgs(t1, tt.kv))
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
 
         case tt.ops == "rotateRight":
-            method.Func.Call(ToArgs2(t1, t1.root))
+            method.Func.Call(ToArgs(t1, t1.root))
         }
         assertEqualTree(t1, t, tt.expected)
+    }
+}
+
+func TestRedBlackParentLookup(t *testing.T) {
+    tr := NewTree()
+
+    // Lookup for something in an empty tree
+    found, parent, dir := tr.GetParent(5)
+    False(found, t)
+    Nil(parent, t)
+    assertDirection(NODIR, dir, t)
+
+    key7 := 7
+    tr.Put(key7, "payload7")
+    // Lookup the root node
+    found, parent, dir = tr.GetParent(key7)
+    True(found, t)
+    Nil(parent, t)
+    assertDirection(NODIR, dir, t)
+
+    key3, key11 := 3, 11
+    tr.Put(key3, "payload3")
+    tr.Put(key11, "payload11")
+
+    found, parent, dir = tr.GetParent(key3)
+    True(found, t)
+    NotNil(parent, t)
+    if parent.value != key7 {
+		t.Errorf("Expected root node 7")
+    }
+    assertDirection(LEFT, dir, t)
+
+    found, parent, dir = tr.GetParent(key11)
+    True(found, t)
+    NotNil(parent, t)
+    if parent.value != key7 {
+		t.Errorf("Expected root node 7")
+    }
+    assertDirection(RIGHT, dir, t)
+}
+
+var treeData = []struct {
+    ops string
+    kv  KV
+}{
+    {"put", KV{7, "payload7"}},
+    {"put", KV{3, "payload3"}},
+    {"put", KV{18, "payload18"}},
+    {"put", KV{10, "payload10"}},
+    {"put", KV{8, "payload8"}},
+    {"put", KV{11, "payload11"}},
+    {"put", KV{22, "payload22"}},
+    {"put", KV{26, "payload26"}},
+}
+
+func TestRedBlackNodeLookup(t *testing.T) {
+    t1 := NewTree()
+    for _, tt := range treeData {
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
+        }
+    }
+    visitor := &InorderVisitor{}
+    t1.Walk(visitor)
+    t.Errorf("%s\n", visitor)
+    if t1.root.value != 8 {
+        t.Errorf("Expect root to be 10, got %#v", t1.root.value)
     }
 }

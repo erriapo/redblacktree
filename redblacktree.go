@@ -1,4 +1,21 @@
-// A red-black tree implementation of Cormen's Algorithms book
+/*
+Copyright 2014 Gavin Bong.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+either express or implied. See the License for the specific
+language governing permissions and limitations under the
+License.
+*/
+
+// A red-black tree implementation of Thomas H. Cormen's et al. Algorithms book 3rd edition.
 package redblacktree
 
 import (
@@ -78,13 +95,12 @@ type Tree struct {
     root *Node
 }
 
-// This mutex protects `logger`
+// `lock` protects `logger`
 var lock sync.Mutex
 var logger *log.Logger
 
 func init() {
     logger = log.New(ioutil.Discard, "", log.LstdFlags)
-    fmt.Println("done .. redblacktree.init")
 }
 
 func TraceOn() {
@@ -106,8 +122,31 @@ func NewTree() *Tree {
     return &Tree{root: nil}
 }
 
-// @TODO Rename GetParent ?
-func (t *Tree) Lookup(key int) (found bool, parent *Node, dir Direction) {
+// Look for the node with supplied key and return its mapped payload
+func (t *Tree) Get(key int) (bool, *Node) {
+    found, parent, dir := t.GetParent(key)
+    if found {
+        if parent == nil {
+            return true, t.root
+        } else {
+            var node *Node
+            switch dir {
+            case LEFT:
+                node = parent.left
+            case RIGHT:
+                node = parent.right
+            }
+
+            if node != nil {
+                return true, node
+            }
+        }
+    }
+    return false, nil
+}
+
+// Look for the node with supplied key and return the parent node.
+func (t *Tree) GetParent(key int) (found bool, parent *Node, dir Direction) {
     if t.root == nil {
         return false, nil, NODIR
     }
@@ -476,7 +515,7 @@ func main() {
 
     log.Printf("\ti8.Eq(i1) is %t\n", i8.Eq(i1))
 
-    f, p, d := tree3.Lookup(10)
+    f, p, d := tree3.GetParent(10)
     if f {
         if p != nil {
             var node *Node
@@ -545,7 +584,7 @@ func main() {
 }
 
 func find(tree Tree, key int) {
-    found, parent, dir := tree.Lookup(key)
+    found, parent, dir := tree.GetParent(key)
     if found {
         if parent != nil {
             log.Printf("Parent %d for %d in direction %s\n", parent.value, key, dir)
