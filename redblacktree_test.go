@@ -20,6 +20,7 @@ package redblacktree
 import (
     _ "fmt"
     "reflect"
+    "sort"
     "testing"
 )
 
@@ -132,6 +133,11 @@ func NotNil(a interface{}, t *testing.T) {
 type KV struct {
     key int
     arg string
+}
+
+type Operation struct {
+    ops string
+    kv  KV
 }
 
 func ToArgs(a ...interface{}) []reflect.Value {
@@ -315,10 +321,7 @@ func TestRedBlackParentLookup(t *testing.T) {
     assertDirection(RIGHT, dir, t)
 }
 
-var treeData = []struct {
-    ops string
-    kv  KV
-}{
+var treeData = []Operation {
     {"put", KV{7, "payload7"}},
     {"put", KV{3, "payload3"}},
     {"put", KV{18, "payload18"}},
@@ -381,8 +384,8 @@ func TestRedBlackNodeLookup(t *testing.T) {
     }
 }
 
-// Removed prefix `Ignore` to test it.
-func IgnoreTestLeftRotateProperly(t *testing.T) {
+// TIL: Add prefix `Ignore` to skip
+func TestLeftRotateProperly(t *testing.T) {
     t1 := NewTree()
     for i, tt := range treeData {
         if i == 9 {
@@ -415,4 +418,81 @@ func IgnoreTestLeftRotateProperly(t *testing.T) {
 
     t1.RotateLeft(node18)
     assertEqualTree(t1, t, "(((.3.)7(.8.))10(((.11.)18(.22.))26(.30.)))")
+}
+
+
+
+type By func(o1, o2 *Operation) bool
+
+func (b By) Sort(ops []Operation) {
+    os := &operationSorter{
+        operations: ops,
+        by:         b,
+    }
+    sort.Sort(os)
+}
+
+type operationSorter struct{
+    operations []Operation
+    by         func(o1, o2 *Operation) bool
+}
+
+func (k operationSorter) Len() int {
+    return len(k.operations)
+}
+
+func (k operationSorter) Swap(i, j int) {
+    k.operations[i], k.operations[j] = k.operations[j], k.operations[i]
+}
+
+func (k operationSorter) Less(i, j int) bool {
+    return k.by(&k.operations[i], &k.operations[j])
+}
+
+var treeData2 = []Operation{
+    {"put", KV{1, "payload1"}},
+    {"put", KV{2, "payload2"}},
+    {"put", KV{3, "payload3"}},
+    {"put", KV{4, "payload4"}},
+    {"put", KV{5, "payload5"}},
+    {"put", KV{6, "payload6"}},
+    {"put", KV{7, "payload7"}},
+    {"put", KV{8, "payload8"}},
+    {"put", KV{9, "payload9"}},
+}
+
+// Two extreme cases:
+// 1. keys are in ascending order (sorted)
+// 2. keys are in descending order (!sorted)
+func TestWorstCases(t *testing.T) {
+    increasingKey := func(o1, o2 *Operation) bool {
+        return o1.kv.key < o2.kv.key
+    }
+    decreasingKey := func(o1, o2 *Operation) bool {
+        return !increasingKey(o1, o2)
+    }
+
+    By(increasingKey).Sort(treeData2)
+    t1 := NewTree()
+    for _, tt := range treeData2 {
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
+        }
+    }
+    assertEqualTree(t1, t, "(((.1.)2(.3.))4((.5.)6((.7.)8(.9.))))")
+    assertNodeKey(t1.root, 4, t)
+
+    By(decreasingKey).Sort(treeData2)
+    t2 := NewTree()
+    for _, tt := range treeData2 {
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(t2, tt.kv.key, tt.kv.arg))
+        }
+    }
+    assertEqualTree(t2, t, "((((.1.)2(.3.))4(.5.))6((.7.)8(.9.)))")
+    assertNodeKey(t2.root, 6, t)
 }
