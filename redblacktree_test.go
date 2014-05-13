@@ -18,6 +18,7 @@ License.
 package redblacktree
 
 import (
+    _ "fmt"
     "reflect"
     "testing"
 )
@@ -48,8 +49,8 @@ func init() {
         "put": put,
     }
 
-    //TraceOff()
-    TraceOn()
+    TraceOff()
+    //TraceOn()
 }
 
 func True(b bool, t *testing.T) {
@@ -68,6 +69,12 @@ func assertDirection(expected Direction, actual Direction, t *testing.T) {
     if actual != expected {
 		t.Errorf("Expected (%s) got (%s)", expected, actual)
 	}
+}
+
+func assertNodeKey(n *Node, expected int, t *testing.T) {
+    if n.value != expected {
+        t.Errorf("Expected (%#v) got (%#v)", expected, n.value)
+    }
 }
 
 // using the inorder walk of the tree for equality
@@ -217,7 +224,7 @@ var fixtureRotationLeft = []struct {
     {"rotateLeft", KV{}, "((((.7.)8.)9.)11.)"},
 }
 
-func TestRedBlackLeft(t *testing.T) {
+func TestRedBlackLeft1(t *testing.T) {
     t1 := NewTree()
     assertEqualTree(t1, t, ".")
     t1.RotateLeft(t1.root)
@@ -320,6 +327,13 @@ var treeData = []struct {
     {"put", KV{11, "payload11"}},
     {"put", KV{22, "payload22"}},
     {"put", KV{26, "payload26"}},
+    {"put", KV{30, "payload30"}},
+    {"put", KV{45, "payload45"}},
+    {"put", KV{35, "payload35"}},
+    {"put", KV{90, "payload90"}},
+    {"put", KV{85, "payload85"}},
+    {"put", KV{83, "payload83"}},
+    {"put", KV{100, "payload100"}},
 }
 
 func TestRedBlackNodeLookup(t *testing.T) {
@@ -331,10 +345,74 @@ func TestRedBlackNodeLookup(t *testing.T) {
             method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
         }
     }
-    visitor := &InorderVisitor{}
-    t1.Walk(visitor)
-    t.Errorf("%s\n", visitor)
-    if t1.root.value != 8 {
-        t.Errorf("Expect root to be 10, got %#v", t1.root.value)
+
+    key10 := 10
+    assertEqualTree(t1, t, "(((.3.)7(.8.))10(((.11.)18(.22.))26((.30.)35((.45(.83.))85(.90(.100.))))))")
+    assertNodeKey(t1.root, key10, t)
+
+    // search for the root
+    {
+        ok, node10 := t1.Get(key10)
+        True(ok, t)
+        NotNil(node10, t)
+        assertNodeKey(node10, key10, t)
     }
+
+    // search for non-existent node
+    {
+        ok, node6 := t1.Get(6)
+        False(ok, t)
+        Nil(node6, t)
+    }
+
+    // search for nodes that exist
+    {
+        key3, key100 := 3, 100
+
+        ok, node3 := t1.Get(key3)
+        True(ok, t)
+        NotNil(node3, t)
+        assertNodeKey(node3, key3, t)
+
+        ok, node100 := t1.Get(key100)
+        True(ok, t)
+        NotNil(node100, t)
+        assertNodeKey(node100, key100, t)
+    }
+}
+
+// Removed prefix `Ignore` to test it.
+func IgnoreTestLeftRotateProperly(t *testing.T) {
+    t1 := NewTree()
+    for i, tt := range treeData {
+        if i == 9 {
+            break
+        }
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
+        }
+    }
+
+    key18 := 18
+    ok, node18 := t1.Get(key18)
+    True(ok, t)
+    NotNil(node18, t)
+    assertNodeKey(node18, key18, t)
+
+    /*
+      (n) = black
+             (10)
+            /    \
+           7     18
+          / \   /  \
+        (3) (8)(11)(26)
+                    / \
+                   22  30
+    */
+    assertEqualTree(t1, t, "(((.3.)7(.8.))10((.11.)18((.22.)26(.30.))))")
+
+    t1.RotateLeft(node18)
+    assertEqualTree(t1, t, "(((.3.)7(.8.))10(((.11.)18(.22.))26(.30.)))")
 }

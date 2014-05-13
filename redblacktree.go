@@ -25,6 +25,8 @@ import (
     "io/ioutil"
     "log"
     "os"
+    "reflect"
+    "strings"
     "sync"
 )
 
@@ -268,8 +270,25 @@ func (t *Tree) Put(key int, data interface{}) {
     }
 }
 
+func isRed(n *Node) bool {
+    value := reflect.ValueOf(n)
+    if value.IsNil() {
+        return false
+    } else {
+        return n.color == RED
+    }
+}
+
 func isBlack(n *Node) bool {
-    return n == nil || n.color == BLACK
+    if n == nil {
+        return true
+    }
+    value := reflect.ValueOf(n)
+    if value.IsNil() {
+        return true
+    } else {
+        return n.color == BLACK
+    }
 }
 
 // fix possible violations of red-black-tree properties 
@@ -285,6 +304,7 @@ func (t *Tree) fixup(z *Node) {
     logger.Printf("\tfixup new node z %s\n", z.String())
 loop:
     for {
+        logger.Printf("\tcurrent z %s\n", z.String())
         switch {
         case z.parent == nil:
             fallthrough
@@ -295,13 +315,12 @@ loop:
             logger.Printf("\t\t=> bye\n");
             break loop
         case z.parent.color == RED:
-            logger.Printf("\t\t=> do something here\n")
-
             grandparent := z.parent.parent
             if z.parent == grandparent.left {
                 logger.Printf("\t\t%s is the left child of %s\n", z.parent, grandparent)
                 y := grandparent.right
-                if !isBlack(y) {
+                logger.Printf("\t\ty (right) %s\n", y)
+                if isRed(y) {
                     // case 1 - y is RED
                     logger.Printf("\t\t(*) case 1\n")
                     z.parent.color = BLACK
@@ -326,31 +345,31 @@ loop:
             } else {
                 logger.Printf("\t\t%s is the right child of %s\n", z.parent, grandparent)
                 y := grandparent.left
-                if !isBlack(y) {
+                logger.Printf("\t\ty (left) %s\n", y)
+                if isRed(y) {
                     // case 1 - y is RED
-                    logger.Printf("\t\t(*) case 1\n")
+                    logger.Printf("\t\t..(*) case 1\n")
                     z.parent.color = BLACK
                     y.color = BLACK
                     grandparent.color = RED
                     z = grandparent
 
                 } else {
+                    logger.Printf("\t\t## %s\n", z.parent.left)
                     if (z == z.parent.left) {
                         // case 2
-                        logger.Printf("\t\t(*) case 2\n")
+                        logger.Printf("\t\t..(*) case 2\n")
                         z = z.parent
                         t.RotateRight(z)
                     }
 
                     // case 3
-                    logger.Printf("\t\t(*) case 3\n")
+                    logger.Printf("\t\t..(*) case 3\n")
                     z.parent.color = BLACK
                     grandparent.color = RED
                     t.RotateLeft(grandparent)
                 }
             }
-
-            break loop
         }
     }
     t.root.color = BLACK
@@ -399,6 +418,10 @@ func (v *InorderVisitor) Eq(other *InorderVisitor) bool {
     return v.String() == other.String()
 }
 
+func (v *InorderVisitor) trim(s string) string {
+    return strings.TrimRight(strings.TrimRight(s, "ed"), "lack")
+}
+
 func (v *InorderVisitor) String() string {
     return v.buffer.String()
 }
@@ -411,6 +434,7 @@ func (v *InorderVisitor) Visit(node *Node) {
     v.buffer.Write([]byte("("))
     v.Visit(node.left)
     v.buffer.Write([]byte(fmt.Sprintf("%d", node.value)))
+    //v.buffer.Write([]byte(fmt.Sprintf("%d{%s}", node.value, v.trim(node.color.String()))))
     v.Visit(node.right)
     v.buffer.Write([]byte(")"))
 }
