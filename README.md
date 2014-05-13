@@ -1,10 +1,6 @@
 ## redblacktree
 
-A redblack tree.
-
-## Dependencies
-
-* None
+A [redblack tree](http://en.wikipedia.org/wiki/Red%E2%80%93black_tree). See docs at [http://godoc.org/github.com/erriapo/redblacktree](http://godoc.org/github.com/erriapo/redblacktree)
 
 ## License
 
