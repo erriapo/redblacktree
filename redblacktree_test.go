@@ -46,8 +46,8 @@ func init() {
 
     funcs = map[string]reflect.Method{
         "rotateRight": rotateRight,
-        "rotateLeft": rotateLeft,
-        "put": put,
+        "rotateLeft":  rotateLeft,
+        "put":         put,
     }
 
     TraceOff()
@@ -55,21 +55,21 @@ func init() {
 }
 
 func True(b bool, t *testing.T) {
-	if !b {
-		t.Errorf("Expected [ %t ] got [ %t ]", true, b)
-	}
+    if !b {
+        t.Errorf("Expected [ %t ] got [ %t ]", true, b)
+    }
 }
 
 func False(b bool, t *testing.T) {
-	if b {
-		t.Errorf("Expected [ %t ] got [ %t ]", false, b)
-	}
+    if b {
+        t.Errorf("Expected [ %t ] got [ %t ]", false, b)
+    }
 }
 
 func assertDirection(expected Direction, actual Direction, t *testing.T) {
     if actual != expected {
-		t.Errorf("Expected (%s) got (%s)", expected, actual)
-	}
+        t.Errorf("Expected (%s) got (%s)", expected, actual)
+    }
 }
 
 func assertNodeKey(n *Node, expected int, t *testing.T) {
@@ -87,17 +87,24 @@ func assertEqualTree(tr *Tree, t *testing.T, expected string) {
     }
 }
 
-// Value.IsNil returns true if v is a nil value. It panics if 
+// Value.IsNil returns true if v is a nil value. It panics if
 // v's Kind is not Chan, Func, Interface, Map, Ptr, or Slice.
 func nillable(k reflect.Kind) bool {
     switch k {
-    case reflect.Chan: fallthrough
-    case reflect.Func: fallthrough
-    case reflect.Interface: fallthrough
-    case reflect.Map: fallthrough
-    case reflect.Ptr: fallthrough
-    case reflect.Slice: return true
-    default: return false
+    case reflect.Chan:
+        fallthrough
+    case reflect.Func:
+        fallthrough
+    case reflect.Interface:
+        fallthrough
+    case reflect.Map:
+        fallthrough
+    case reflect.Ptr:
+        fallthrough
+    case reflect.Slice:
+        return true
+    default:
+        return false
     }
 }
 
@@ -109,11 +116,11 @@ func Nil(a interface{}, t *testing.T) {
     value := reflect.ValueOf(a)
     if nillable(value.Kind()) {
         if !value.IsNil() {
-			t.Errorf("%#v is not nil", a)
-		}
+            t.Errorf("%#v is not nil", a)
+        }
     } else {
         t.Errorf("%#v is not nil", a)
-	}
+    }
 }
 
 // asserts that @param `a` is NOT nil
@@ -125,8 +132,8 @@ func NotNil(a interface{}, t *testing.T) {
     value := reflect.ValueOf(a)
     if nillable(value.Kind()) {
         if value.IsNil() {
-			t.Errorf("%#v is nil but we expected it to be NOT nil", a)
-		}
+            t.Errorf("%#v is nil but we expected it to be NOT nil", a)
+        }
     }
 }
 
@@ -150,8 +157,8 @@ func ToArgs(a ...interface{}) []reflect.Value {
 }
 
 var fixtureSmall = []struct {
-    ops string
-    kv  KV
+    ops      string
+    kv       KV
     expected string
 }{
     {"put", KV{7, "payload7"}, "(.7.)"},
@@ -170,14 +177,14 @@ func TestRedBlackSmall(t *testing.T) {
     for _, tt := range fixtureSmall {
         method := funcs[tt.ops]
         in := ToArgs(t2, tt.kv.key, tt.kv.arg)
-        method.Func.Call(in) // @TODO returns []reflect.Value ?
+        method.Func.Call(in)
         assertEqualTree(t2, t, tt.expected)
     }
 }
 
 var fixtureSimpleRightRotation = []struct {
-    ops string
-    kv  KV
+    ops      string
+    kv       KV
     expected string
 }{
     {"put", KV{7, "payload7"}, "(.7.)"},
@@ -195,8 +202,8 @@ func TestRedBlackSimpleRightRotation(t *testing.T) {
 }
 
 var fixtureCase1 = []struct {
-    ops string
-    kv  KV
+    ops      string
+    kv       KV
     expected string
 }{
     {"put", KV{7, "payload7"}, "(.7.)"},
@@ -216,8 +223,8 @@ func TestRedBlackCase1(t *testing.T) {
 }
 
 var fixtureRotationLeft = []struct {
-    ops string
-    kv  KV
+    ops      string
+    kv       KV
     expected string
 }{
     {"put", KV{7, "payload7"}, "(.7.)"},
@@ -250,8 +257,8 @@ func TestRedBlackLeft1(t *testing.T) {
 }
 
 var fixtureRotationRight = []struct {
-    ops string
-    kv  KV
+    ops      string
+    kv       KV
     expected string
 }{
     {"put", KV{7, "payload7"}, "(.7.)"},
@@ -308,7 +315,7 @@ func TestRedBlackParentLookup(t *testing.T) {
     True(found, t)
     NotNil(parent, t)
     if parent.value != key7 {
-		t.Errorf("Expected root node 7")
+        t.Errorf("Expected root node 7")
     }
     assertDirection(LEFT, dir, t)
 
@@ -316,12 +323,12 @@ func TestRedBlackParentLookup(t *testing.T) {
     True(found, t)
     NotNil(parent, t)
     if parent.value != key7 {
-		t.Errorf("Expected root node 7")
+        t.Errorf("Expected root node 7")
     }
     assertDirection(RIGHT, dir, t)
 }
 
-var treeData = []Operation {
+var treeData = []Operation{
     {"put", KV{7, "payload7"}},
     {"put", KV{3, "payload3"}},
     {"put", KV{18, "payload18"}},
@@ -405,22 +412,20 @@ func TestLeftRotateProperly(t *testing.T) {
     assertNodeKey(node18, key18, t)
 
     /*
-      (n) = black
-             (10)
-            /    \
-           7     18
-          / \   /  \
-        (3) (8)(11)(26)
-                    / \
-                   22  30
+       (n) = black
+              (10)
+             /    \
+            7     18
+           / \   /  \
+         (3) (8)(11)(26)
+                     / \
+                    22  30
     */
     assertEqualTree(t1, t, "(((.3.)7(.8.))10((.11.)18((.22.)26(.30.))))")
 
     t1.RotateLeft(node18)
     assertEqualTree(t1, t, "(((.3.)7(.8.))10(((.11.)18(.22.))26(.30.)))")
 }
-
-
 
 type By func(o1, o2 *Operation) bool
 
@@ -432,7 +437,7 @@ func (b By) Sort(ops []Operation) {
     sort.Sort(os)
 }
 
-type operationSorter struct{
+type operationSorter struct {
     operations []Operation
     by         func(o1, o2 *Operation) bool
 }

@@ -15,12 +15,14 @@ language governing permissions and limitations under the
 License.
 */
 
-// A red-black tree implementation of Thomas H. Cormen's et al. Algorithms book 3rd edition.
+// Package redblacktree provides a pure Golang implementation 
+// of a red-black tree as described by Thomas H. Cormen's et al. 
+// in their seminal Algorithms book (3rd ed).
 package redblacktree
 
 import (
-    "fmt"
     "bytes"
+    "fmt"
     "io"
     "io/ioutil"
     "log"
@@ -30,29 +32,38 @@ import (
     "sync"
 )
 
+// Color of a redblack tree node is either 
+// `Black` (true) & `Red` (false)
 type Color bool
+
+// Direction points to either the Left or Right subtree
 type Direction byte
 
-// Black (true) & Red (false)
 func (c Color) String() string {
     switch c {
-    case true: return "Black"
-    default: return "Red"
+    case true:
+        return "Black"
+    default:
+        return "Red"
     }
 }
 
 func (d Direction) String() string {
     switch d {
-    case LEFT: return "left"
-    case RIGHT: return "right"
-    case NODIR: return "center"
-    default: return "not recognized"
+    case LEFT:
+        return "left"
+    case RIGHT:
+        return "right"
+    case NODIR:
+        return "center"
+    default:
+        return "not recognized"
     }
 }
 
 const (
-    BLACK, RED Color = true, false
-    LEFT Direction = iota
+    BLACK, RED Color     = true, false
+    LEFT       Direction = iota
     RIGHT
     NODIR
 )
@@ -62,8 +73,8 @@ const (
 // - Who is my grandparent node ?
 // The zero value for Node has color Red.
 type Node struct {
-    value   int
-    color   Color
+    value  int
+    color  Color
     left   *Node
     right  *Node
     parent *Node
@@ -89,10 +100,12 @@ type Visitor interface {
     Visit(*Node)
 }
 
+// A redblack tree is `Visitable` by a `Visitor`.
 type Visitable interface {
     Walk(Visitor)
 }
 
+// Tree encapsulates the data structure.
 type Tree struct {
     root *Node
 }
@@ -105,26 +118,30 @@ func init() {
     logger = log.New(ioutil.Discard, "", log.LstdFlags)
 }
 
+// TraceOn turns on logging output to Stderr
 func TraceOn() {
     SetOutput(os.Stderr)
 }
 
+// TraceOff turns off logging.
+// By default logging is turned off.
 func TraceOff() {
     SetOutput(ioutil.Discard)
 }
 
-// Redirect log output
+// SetOutput redirects log output
 func SetOutput(w io.Writer) {
     lock.Lock()
     defer lock.Unlock()
     logger = log.New(w, "", log.LstdFlags)
 }
 
+// NewTree returns an empty Tree
 func NewTree() *Tree {
     return &Tree{root: nil}
 }
 
-// Look for the node with supplied key and return its mapped payload
+// Get looks for the node with supplied key and returns its mapped payload
 func (t *Tree) Get(key int) (bool, *Node) {
     found, parent, dir := t.GetParent(key)
     if found {
@@ -147,7 +164,7 @@ func (t *Tree) Get(key int) (bool, *Node) {
     return false, nil
 }
 
-// Look for the node with supplied key and return the parent node.
+// GetParent looks for the node with supplied key and returns the parent node.
 func (t *Tree) GetParent(key int) (found bool, parent *Node, dir Direction) {
     if t.root == nil {
         return false, nil, NODIR
@@ -261,8 +278,10 @@ func (t *Tree) Put(key int, data interface{}) {
         } else {
             newNode := &Node{value: key, parent: parent}
             switch dir {
-            case LEFT: parent.left = newNode
-            case RIGHT: parent.right = newNode
+            case LEFT:
+                parent.left = newNode
+            case RIGHT:
+                parent.right = newNode
             }
             logger.Printf("Added %s to %s node of parent %s\n", newNode.String(), dir, parent.String())
             t.fixup(newNode)
@@ -291,14 +310,14 @@ func isBlack(n *Node) bool {
     }
 }
 
-// fix possible violations of red-black-tree properties 
+// fix possible violations of red-black-tree properties
 // with combinations of:
 // 1. recoloring
 // 2. rotations
 //
 // Preconditions:
 // P1) z is not nil
-// 
+//
 // @param z - the newly added Node to the tree.
 func (t *Tree) fixup(z *Node) {
     logger.Printf("\tfixup new node z %s\n", z.String())
@@ -312,7 +331,7 @@ loop:
             fallthrough
         default:
             // When the loop terminates, it does so because p[z] is black.
-            logger.Printf("\t\t=> bye\n");
+            logger.Printf("\t\t=> bye\n")
             break loop
         case z.parent.color == RED:
             grandparent := z.parent.parent
@@ -329,7 +348,7 @@ loop:
                     z = grandparent
 
                 } else {
-                    if (z == z.parent.right) {
+                    if z == z.parent.right {
                         // case 2
                         logger.Printf("\t\t(*) case 2\n")
                         z = z.parent
@@ -356,7 +375,7 @@ loop:
 
                 } else {
                     logger.Printf("\t\t## %s\n", z.parent.left)
-                    if (z == z.parent.left) {
+                    if z == z.parent.left {
                         // case 2
                         logger.Printf("\t\t..(*) case 2\n")
                         z = z.parent
@@ -375,39 +394,15 @@ loop:
     t.root.color = BLACK
 }
 
-// Tree is Visitable
+// Walk accepts a Visitor
 func (t *Tree) Walk(visitor Visitor) {
     visitor.Visit(t.root)
 }
 
-func (t *Tree) PrintRoot() {
-    if t.root != nil {
-        logger.Printf("\tRoot %s\n", t.root)
-    } else {
-        logger.Printf("\tRoot is nil\n")
-    }
-}
-
-// @deprecated
-func (t *Tree) Inorder() {
-    if t.root != nil {
-        t.root.visit()
-    }
-}
-
-// @deprecated
-func (n *Node) visit() {
-    if n.left != nil {
-        n.left.visit()
-    }
-    logger.Printf("%d ", n.value)
-    if n.right != nil {
-        n.right.visit()
-    }
-}
-
-// Inorder traversal of tree
-type InorderVisitor struct{
+// InorderVisitor walks the tree in inorder fashion.
+// This visitor maintains internal state; thus do not
+// reuse after the completion of a walk.
+type InorderVisitor struct {
     buffer bytes.Buffer
 }
 
@@ -440,188 +435,10 @@ func (v *InorderVisitor) Visit(node *Node) {
 }
 
 func main() {
-    node1 := Node{value: 10, left: &Node{value:8}, right: &Node{value:11}}
-    node2 := Node{value: 22, right: &Node{value:26}}
-    tree := Tree{root: &Node{value:7, left: &Node{value:3}, right: &Node{value:18, left:&node1, right: &node2}}}
-    tree.Inorder()
-    fmt.Println()
-    i0 := InorderVisitor{}
-    tree.Walk(&i0)
-    fmt.Println(i0.String())
-
-    fmt.Println("1===========")
-    fmt.Println("Direction", LEFT, RIGHT, NODIR)
-    find(tree, 8)
-    find(tree, 7)
-    find(tree, 3)
-    find(tree, 1)
-    find(tree, 4)
-    find(tree, 23)
-    find(tree, 29)
-    find(tree, 18)
-    find(tree, 11)
-    find(tree, 22)
-    find(tree, 26)
-
-    fmt.Println("2==============")
-    tree2 := NewTree()
-    find(*tree2, 4)
-
-    fmt.Println("3==============")
-    tree3 := NewTree()
-    tree3.Put(7, "payload")
-    tree3.Put(3, "payload")
-    tree3.Put(18, "payload")
-    tree3.Put(1, "payload")
-    tree3.Put(10, "payload")
-    tree3.Put(11, "payload")
-    tree3.Put(22, "payload")
-    tree3.Put(8, "payload")
-    tree3.Put(26, "payload")
-    i1 := &InorderVisitor{}
-    tree3.Walk(i1)
-    fmt.Println("i1 ->", i1)
-    tree3.PrintRoot()
-    tree3.Put(7, "payload")
-    tree3.Put(3, "payload")
-    tree3.Put(18, "payload")
-
-    tree3.RotateLeft(nil)
-
-    tree3.RotateLeft(tree3.root)
-    i2 := &InorderVisitor{}
-    tree3.Walk(i2)
-    fmt.Println("i2 ->", i2)
-    tree3.PrintRoot()
-
-    tree3.RotateLeft(tree3.root)
-    i3 := &InorderVisitor{}
-    tree3.Walk(i3)
-    fmt.Println("i3 ->", i3)
-    tree3.PrintRoot()
-
-    tree3.RotateLeft(tree3.root)
-    i4 := &InorderVisitor{}
-    tree3.Walk(i4)
-    fmt.Println("i4 ->", i4)
-    tree3.PrintRoot()
-
-    tree3.RotateLeft(tree3.root)
-    i5 := &InorderVisitor{}
-    tree3.Walk(i5)
-    fmt.Println("i5 ->", i5)
-    tree3.PrintRoot()
-
-    log.Printf("\ti4.Eq(i5) is %t\n", i4.Eq(i5))
-
-    tree3.RotateRight(tree3.root)
-    i6 := &InorderVisitor{}
-    tree3.Walk(i6)
-    fmt.Println("i6 ->", i6)
-    tree3.PrintRoot()
-
-    log.Printf("\ti6.Eq(i3) is %t\n", i6.Eq(i3))
-    log.Printf("\ti6.Eq(i5) is %t\n", i6.Eq(i5))
-
-    tree3.RotateRight(tree3.root)
-    i7 := &InorderVisitor{}
-    tree3.Walk(i7)
-    fmt.Println("i7 ->", i7)
-    tree3.PrintRoot()
-
-    log.Printf("\ti7.Eq(i2) is %t\n", i7.Eq(i2))
-
-    tree3.RotateRight(tree3.root)
-    i8 := &InorderVisitor{}
-    tree3.Walk(i8)
-    fmt.Println("i8 ->", i8)
-    tree3.PrintRoot()
-
-    log.Printf("\ti8.Eq(i1) is %t\n", i8.Eq(i1))
-
-    f, p, d := tree3.GetParent(10)
-    if f {
-        if p != nil {
-            var node *Node
-            switch d {
-            case LEFT:
-                node = p.left
-            case RIGHT:
-                node = p.right
-            }
-            if node != nil {
-                tree3.RotateRight(node)
-                i9 := &InorderVisitor{}
-                tree3.Walk(i9)
-                fmt.Println("i9 ->", i9)
-                tree3.PrintRoot()
-                log.Printf("\ti9.Eq(i8) is %t\n", i9.Eq(i8))
-            }
-        }
-    }
-
-    fmt.Println("4 ................")
-    tree4 := NewTree()
-    tree4.Put(7, "payload")
-    tree4.Put(3, "payload")
-
-    visitor1 := &InorderVisitor{}
-    tree4.Walk(visitor1)
-    fmt.Println("tree4: visitor1 ->", visitor1)
-
-    tree4.Put(1, "payload")
-    visitor2 := &InorderVisitor{}
-    tree4.Walk(visitor2)
-    fmt.Println("tree4: visitor2 ->", visitor2)
-
-    fmt.Println("5 ................")
-    tree5 := NewTree()
-    tree5.Put(7, "payload")
-    tree5.Put(8, "payload")
-
-    visitor3 := &InorderVisitor{}
-    tree5.Walk(visitor3)
-    fmt.Println("tree5: visitor3 ->", visitor3)
-
-    tree5.Put(9, "payload")
-    tree5.Put(11, "payload")
-    tree5.Put(10, "payload")
-    visitor4 := &InorderVisitor{}
-    tree5.Walk(visitor4)
-    fmt.Println("tree5: visitor4 ->", visitor4)
-
-    fmt.Println("6 ................")
-    tree6 := NewTree()
-    tree6.Put(7, "payload")
-    tree6.Put(3, "payload")
-    tree6.Put(9, "payload")
-
-    visitor5 := &InorderVisitor{}
-    tree6.Walk(visitor5)
-    fmt.Println("tree6: visitor5 ->", visitor5)
-
-    tree6.Put(1, "payload")
-    tree6.Put(2, "payload")
-    visitor6 := &InorderVisitor{}
-    tree6.Walk(visitor6)
-    fmt.Println("tree6: visitor6 ->", visitor6)
-}
-
-func find(tree Tree, key int) {
-    found, parent, dir := tree.GetParent(key)
-    if found {
-        if parent != nil {
-            log.Printf("Parent %d for %d in direction %s\n", parent.value, key, dir)
-        } else {
-            log.Printf("Found %d as the root node in direction %s\n", key, dir)
-        }
-
-    } else {
-        log.Printf("%d not found in tree\n", key)
-        if parent != nil {
-            log.Printf("\tInsert it as the %s node of %d\n", dir, parent.value)
-        } else {
-            log.Printf("\tInsert it as root node in direction %s\n", dir)
-        }
-    }
+    // example manual tree construction
+    node1 := Node{value: 10, left: &Node{value: 8}, right: &Node{value: 11}}
+    node2 := Node{value: 22, right: &Node{value: 26}}
+    tree := Tree{root: &Node{value: 7, left: &Node{value: 3}, right: &Node{value: 18, left: &node1, right: &node2}}}
+    visitor := &InorderVisitor{}
+    tree.Walk(visitor)
 }
