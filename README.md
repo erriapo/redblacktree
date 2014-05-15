@@ -1,10 +1,8 @@
-[![Build Status](https://secure.travis-ci.org/erriapo/redblacktree.png)](https://travis-ci.org/erriapo/redblacktree)
+[![Build Status](https://secure.travis-ci.org/erriapo/redblacktree.png)](https://travis-ci.org/erriapo/redblacktree) 
 
 ## redblacktree
 
-A [redblack tree](http://en.wikipedia.org/wiki/Red%E2%80%93black_tree). 
-
-[![GoDoc](https://godoc.org/github.com/erriapo/redblacktree?status.png)](https://godoc.org/github.com/erriapo/redblacktree)
+A [redblack tree](http://en.wikipedia.org/wiki/Red%E2%80%93black_tree). [![GoDoc](https://godoc.org/github.com/erriapo/redblacktree?status.png)](https://godoc.org/github.com/erriapo/redblacktree)
 
 ## Usage
 
