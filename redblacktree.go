@@ -17,7 +17,8 @@ License.
 
 // Package redblacktree provides a pure Golang implementation 
 // of a red-black tree as described by Thomas H. Cormen's et al. 
-// in their seminal Algorithms book (3rd ed).
+// in their seminal Algorithms book (3rd ed). This data structure
+// is not multi-goroutine safe.
 package redblacktree
 
 import (
@@ -73,7 +74,8 @@ const (
 // - Who is my grandparent node ?
 // The zero value for Node has color Red.
 type Node struct {
-    value  int
+    value  int // @TODO rename to key ??
+    payload interface{}
     color  Color
     left   *Node
     right  *Node
@@ -142,11 +144,11 @@ func NewTree() *Tree {
 }
 
 // Get looks for the node with supplied key and returns its mapped payload
-func (t *Tree) Get(key int) (bool, *Node) {
+func (t *Tree) Get(key int) (bool, interface{}) {
     found, parent, dir := t.GetParent(key)
     if found {
         if parent == nil {
-            return true, t.root
+            return true, t.root.payload
         } else {
             var node *Node
             switch dir {
@@ -157,7 +159,7 @@ func (t *Tree) Get(key int) (bool, *Node) {
             }
 
             if node != nil {
-                return true, node
+                return true, node.payload
             }
         }
     }
@@ -249,8 +251,9 @@ func (t *Tree) RotateLeft(x *Node) {
     x.parent = y
 }
 
-// Insert an element
-// @TODO follow Java's TreeMap's Put(key K, value V). Should I return the V ? or an error
+// Put saves the mapping (key, data) into the tree.
+// If a mapping identified by `key` already exists, it is overwritten.
+// Constraint: keys cannot be nil & will cause a panic.
 func (t *Tree) Put(key int, data interface{}) {
     if t.root == nil {
         t.root = &Node{value: key, color: BLACK}
@@ -261,22 +264,21 @@ func (t *Tree) Put(key int, data interface{}) {
     found, parent, dir := t.internalLookup(nil, t.root, key, NODIR)
     if found {
         if parent == nil {
-            fmt.Println("Parent nil and found. Overwrite ROOT NODE")
+            logger.Printf("Put: parent=nil & found. Overwrite ROOT node\n")
+            t.root.payload = data
         } else {
-            fmt.Println("Parent not nil and found")
+            logger.Printf("Put: parent!=nil & found. Overwriting\n")
             switch dir {
             case LEFT:
-                fallthrough
+                parent.left.payload = data
             case RIGHT:
-                logger.Printf("\tOverwrite %s node of parent %d\n", dir, parent.value)
+                parent.right.payload = data
             }
         }
 
     } else {
-        if parent == nil {
-            logger.Printf("???Parent nil and not found in tree")
-        } else {
-            newNode := &Node{value: key, parent: parent}
+        if parent != nil {
+            newNode := &Node{value: key, parent: parent, payload: data}
             switch dir {
             case LEFT:
                 parent.left = newNode
@@ -295,18 +297,6 @@ func isRed(n *Node) bool {
         return false
     } else {
         return n.color == RED
-    }
-}
-
-func isBlack(n *Node) bool {
-    if n == nil {
-        return true
-    }
-    value := reflect.ValueOf(n)
-    if value.IsNil() {
-        return true
-    } else {
-        return n.color == BLACK
     }
 }
 
@@ -394,9 +384,33 @@ loop:
     t.root.color = BLACK
 }
 
+// Size returns the number of 
+// items in the tree.
+func (t *Tree) Size() uint64 {
+    visitor := &countingVisitor{}
+    t.Walk(visitor)
+    return visitor.Count
+}
+
 // Walk accepts a Visitor
 func (t *Tree) Walk(visitor Visitor) {
     visitor.Visit(t.root)
+}
+
+// countingVisitor counts the number
+// of nodes in the tree.
+type countingVisitor struct {
+    Count uint64
+}
+
+func (v *countingVisitor) Visit(node *Node) {
+    if node == nil {
+        return
+    }
+
+    v.Visit(node.left)
+    v.Count = v.Count + 1
+    v.Visit(node.right)
 }
 
 // InorderVisitor walks the tree in inorder fashion.

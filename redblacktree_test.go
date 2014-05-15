@@ -28,12 +28,16 @@ var funcs map[string]reflect.Method
 
 func init() {
     var found bool
-    var put, rotateLeft, rotateRight reflect.Method
+    var put, get, rotateLeft, rotateRight reflect.Method
 
     t := reflect.TypeOf(NewTree())
     put, found = t.MethodByName("Put")
     if !found {
         panic("No method `Put` in Tree")
+    }
+    get, found = t.MethodByName("Get")
+    if !found {
+        panic("No method `Get` in Tree")
     }
     rotateLeft, found = t.MethodByName("RotateLeft")
     if !found {
@@ -48,6 +52,7 @@ func init() {
         "rotateRight": rotateRight,
         "rotateLeft":  rotateLeft,
         "put":         put,
+        "get":         get,
     }
 
     TraceOff()
@@ -75,6 +80,18 @@ func assertDirection(expected Direction, actual Direction, t *testing.T) {
 func assertNodeKey(n *Node, expected int, t *testing.T) {
     if n.value != expected {
         t.Errorf("Expected (%#v) got (%#v)", expected, n.value)
+    }
+}
+
+func assertPayloadString(expected string, actual string, t *testing.T) {
+    if actual != expected {
+        t.Errorf("Expected (%#v) got (%#v)", expected, actual)
+    }
+}
+
+func assertEqual(expected uint64, actual uint64, t *testing.T) {
+    if actual != expected {
+        t.Errorf("Expected (%#v) got (%#v)", expected, actual)
     }
 }
 
@@ -362,32 +379,32 @@ func TestRedBlackNodeLookup(t *testing.T) {
 
     // search for the root
     {
-        ok, node10 := t1.Get(key10)
+        ok, payload := t1.Get(key10)
         True(ok, t)
-        NotNil(node10, t)
-        assertNodeKey(node10, key10, t)
+        NotNil(payload, t)
+        assertPayloadString("payload10", payload.(string), t)
     }
 
     // search for non-existent node
     {
-        ok, node6 := t1.Get(6)
+        ok, payload := t1.Get(6)
         False(ok, t)
-        Nil(node6, t)
+        Nil(payload, t)
     }
 
     // search for nodes that exist
     {
         key3, key100 := 3, 100
 
-        ok, node3 := t1.Get(key3)
+        ok, payload3 := t1.Get(key3)
         True(ok, t)
-        NotNil(node3, t)
-        assertNodeKey(node3, key3, t)
+        NotNil(payload3, t)
+        assertPayloadString("payload3", payload3.(string), t)
 
-        ok, node100 := t1.Get(key100)
+        ok, payload100 := t1.Get(key100)
         True(ok, t)
-        NotNil(node100, t)
-        assertNodeKey(node100, key100, t)
+        NotNil(payload100, t)
+        assertPayloadString("payload100", payload100.(string), t)
     }
 }
 
@@ -406,10 +423,10 @@ func TestLeftRotateProperly(t *testing.T) {
     }
 
     key18 := 18
-    ok, node18 := t1.Get(key18)
+    ok, payload18 := t1.Get(key18)
     True(ok, t)
-    NotNil(node18, t)
-    assertNodeKey(node18, key18, t)
+    NotNil(payload18, t)
+    assertPayloadString("payload18", payload18.(string), t)
 
     /*
        (n) = black
@@ -423,7 +440,9 @@ func TestLeftRotateProperly(t *testing.T) {
     */
     assertEqualTree(t1, t, "(((.3.)7(.8.))10((.11.)18((.22.)26(.30.))))")
 
-    t1.RotateLeft(node18)
+    found, parent, dir := t1.GetParent(key18)
+    True(found, t); NotNil(parent, t); assertDirection(RIGHT, dir, t)
+    t1.RotateLeft(parent.right)
     assertEqualTree(t1, t, "(((.3.)7(.8.))10(((.11.)18(.22.))26(.30.)))")
 }
 
@@ -500,4 +519,61 @@ func TestWorstCases(t *testing.T) {
     }
     assertEqualTree(t2, t, "((((.1.)2(.3.))4(.5.))6((.7.)8(.9.)))")
     assertNodeKey(t2.root, 6, t)
+}
+
+func TestIsRed(t *testing.T) {
+    t1 := NewTree()
+    if isRed(nil) {
+        t.Errorf("Expected nil to be Black")
+    }
+    if isRed(t1.root) {
+        t.Errorf("Expected nil root node to be Black")
+    }
+    t1.Put(1, "payload1")
+    if isRed(t1.root) {
+        t.Errorf("Expected valid root node to be Black")
+    }
+}
+
+// @TODO add deletes to the mix
+var fixtureSize = []struct {
+    ops      string
+    kv       KV
+    expected uint64
+}{
+    {"1st", KV{}, 0},
+    {"put", KV{7, "payload7"}, 1},
+    {"put", KV{1, "payload1"}, 2},
+    {"get", KV{1, "payload1"}, 2},
+    {"put", KV{9, "payload9"}, 3},
+    {"put", KV{1, "payload1+"}, 3},
+    {"get", KV{1, "payload1+"}, 3},
+    {"get", KV{9, "payload9"}, 3},
+    {"put", KV{9, "payload9+"}, 3},
+    {"get", KV{9, "payload9+"}, 3},
+}
+
+func TestSize(t *testing.T) {
+    t1 := NewTree()
+    for _, tt := range fixtureSize {
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
+        case tt.ops == "1st":
+            // noop
+        case tt.ops == "get":
+            result := method.Func.Call(ToArgs(t1, tt.kv.key))
+            //fmt.Printf("%T %#v %d\n", result, result, len(result))
+            if result[0].Kind() != reflect.Bool {
+                t.Errorf("Expected Bool")
+            }
+            if result[1].Kind() != reflect.Interface {
+                t.Errorf("Expected interface")
+            }
+            True(result[0].Bool(), t)
+            assertPayloadString(tt.kv.arg, result[1].Interface().(string), t)
+        }
+        assertEqual(tt.expected, t1.Size(), t)
+    }
 }
