@@ -577,3 +577,22 @@ func TestSize(t *testing.T) {
         assertEqual(tt.expected, t1.Size(), t)
     }
 }
+
+func TestHas(t *testing.T) {
+    t1 := NewTree()
+    False(t1.Has(0), t)
+    False(t1.Has(1), t)
+
+    for _, tt := range treeData2 {
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
+        }
+    }
+
+    False(t1.Has(0), t)
+    for _, tt := range treeData2 {
+        True(t1.Has(tt.kv.key), t)
+    }
+}

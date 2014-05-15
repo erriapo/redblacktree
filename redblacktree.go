@@ -70,11 +70,11 @@ const (
 )
 
 // A node needs to be able to answer the query:
-// - Who is my parent node ?
-// - Who is my grandparent node ?
+// (i) Who is my parent node ?
+// (ii) Who is my grandparent node ?
 // The zero value for Node has color Red.
 type Node struct {
-    value  int // @TODO rename to key ??
+    value  int // @TODO rename to key ?? Change type to interface{}
     payload interface{}
     color  Color
     left   *Node
@@ -384,12 +384,17 @@ loop:
     t.root.color = BLACK
 }
 
-// Size returns the number of 
-// items in the tree.
+// Size returns the number of items in the tree.
 func (t *Tree) Size() uint64 {
     visitor := &countingVisitor{}
     t.Walk(visitor)
     return visitor.Count
+}
+
+// Has checks for existence of a item identified by supplied key.
+func (t *Tree) Has(key int) bool {
+    found, _, _ := t.internalLookup(nil, t.root, key, NODIR)
+    return found
 }
 
 // Walk accepts a Visitor
