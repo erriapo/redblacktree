@@ -145,10 +145,19 @@ func NewTree() *Tree {
 
 // Get looks for the node with supplied key and returns its mapped payload
 func (t *Tree) Get(key int) (bool, interface{}) {
+    ok, node := t.getNode(key)
+    if ok {
+        return true, node.payload
+    } else {
+        return false, nil
+    }
+}
+
+func (t *Tree) getNode(key int) (bool, *Node) {
     found, parent, dir := t.GetParent(key)
     if found {
         if parent == nil {
-            return true, t.root.payload
+            return true, t.root
         } else {
             var node *Node
             switch dir {
@@ -159,11 +168,23 @@ func (t *Tree) Get(key int) (bool, interface{}) {
             }
 
             if node != nil {
-                return true, node.payload
+                return true, node
             }
         }
     }
     return false, nil
+}
+
+// getMinimum returns the node with minimum key starting
+// at the subtree rooted at node x. Assume x is not nil.
+func (t *Tree) getMinimum(x *Node) *Node {
+    for {
+        if x.left != nil {
+            x = x.left
+        } else {
+            return x
+        }
+    }
 }
 
 // GetParent looks for the node with supplied key and returns the parent node.
@@ -395,6 +416,67 @@ func (t *Tree) Size() uint64 {
 func (t *Tree) Has(key int) bool {
     found, _, _ := t.internalLookup(nil, t.root, key, NODIR)
     return found
+}
+
+func (t *Tree) transplant(u *Node, v *Node) {
+    if u.parent == nil {
+        t.root = v
+    } else if u == u.parent.left {
+        u.parent.left = v
+    } else {
+        u.parent.right = v
+    }
+    if v != nil && u != nil {
+        v.parent = u.parent
+    }
+}
+
+// Delete removes the item identified by the supplied key.
+// Delete is a noop if the supplied key doesn't exist.
+func (t *Tree) Delete(key int) {
+    if !t.Has(key) {
+        logger.Printf("Delete: bail as no node exists for key %d\n", key)
+        return
+    }
+    _, z := t.getNode(key)
+    y := z
+    yOriginalColor := y.color
+    var x *Node
+
+    if z.left == nil {
+        // one child (RIGHT)
+        logger.Printf("Delete: case (a)\n")
+        x = z.right
+        t.transplant(z, z.right)
+
+    } else if z.right == nil {
+        // one child (LEFT)
+        logger.Printf("Delete: case (b)\n")
+        x = z.left
+        t.transplant(z, z.left)
+
+    } else {
+        // two children
+        y = t.getMinimum(z.right)
+        yOriginalColor = y.color
+        x = y.right
+
+        if y.parent == z {
+            x.parent = y
+        } else {
+            t.transplant(y, y.right)
+            y.right = z.right
+            y.right.parent = y
+        }
+        t.transplant(z, y)
+        y.left = z.left
+        y.left.parent = y
+        y.color = z.color
+    }
+    if yOriginalColor == BLACK {
+        // @TODO ...
+        logger.Printf("Delete: fixup %s\n", x)
+    }
 }
 
 // Walk accepts a Visitor

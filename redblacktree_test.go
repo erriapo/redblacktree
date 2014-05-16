@@ -596,3 +596,39 @@ func TestHas(t *testing.T) {
         True(t1.Has(tt.kv.key), t)
     }
 }
+
+func TestMinimum(t *testing.T) {
+    t1 := NewTree()
+    for _, tt := range treeData2 {
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
+        }
+    }
+
+    node := t1.getMinimum(t1.root)
+    NotNil(node, t)
+    assertPayloadString("payload1", node.payload.(string), t)
+}
+
+func TestDelete(t *testing.T) {
+    t1 := NewTree()
+    t1.Delete(1)
+
+    for _, tt := range treeData2 {
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
+        }
+    }
+    // @TODO more stuff & change to table-driven test fixtures
+    assertNodeKey(t1.root, 6, t)
+    assertEqualTree(t1, t, "((((.1.)2(.3.))4(.5.))6((.7.)8(.9.)))")
+    t1.Delete(6) // delete the root
+    assertNodeKey(t1.root, 7, t)
+    assertEqualTree(t1, t, "((((.1.)2(.3.))4(.5.))7(.8(.9.)))")
+    t1.Delete(8) // delete case (a)
+    assertEqualTree(t1, t, "((((.1.)2(.3.))4(.5.))7(.9.))")
+}
