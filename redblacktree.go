@@ -307,7 +307,7 @@ func (t *Tree) Put(key int, data interface{}) {
                 parent.right = newNode
             }
             logger.Printf("Added %s to %s node of parent %s\n", newNode.String(), dir, parent.String())
-            t.fixup(newNode)
+            t.fixupPut(newNode)
         }
     }
 }
@@ -330,7 +330,7 @@ func isRed(n *Node) bool {
 // P1) z is not nil
 //
 // @param z - the newly added Node to the tree.
-func (t *Tree) fixup(z *Node) {
+func (t *Tree) fixupPut(z *Node) {
     logger.Printf("\tfixup new node z %s\n", z.String())
 loop:
     for {
@@ -346,6 +346,7 @@ loop:
             break loop
         case z.parent.color == RED:
             grandparent := z.parent.parent
+            logger.Printf("\t\tgrandparent is nil %t\n", grandparent == nil)
             if z.parent == grandparent.left {
                 logger.Printf("\t\t%s is the left child of %s\n", z.parent, grandparent)
                 y := grandparent.right
@@ -439,30 +440,38 @@ func (t *Tree) Delete(key int) {
         return
     }
     _, z := t.getNode(key)
+    logger.Printf("Delete: attempt to delete %s\n", z)
     y := z
     yOriginalColor := y.color
     var x *Node
 
     if z.left == nil {
         // one child (RIGHT)
-        logger.Printf("Delete: case (a)\n")
+        logger.Printf("\t\tDelete: case (a)\n")
         x = z.right
+        logger.Printf("\t\t\t--- x is right of z")
         t.transplant(z, z.right)
 
     } else if z.right == nil {
         // one child (LEFT)
-        logger.Printf("Delete: case (b)\n")
+        logger.Printf("\t\tDelete: case (b)\n")
         x = z.left
+        logger.Printf("\t\t\t--- x is left of z")
         t.transplant(z, z.left)
 
     } else {
         // two children
+        logger.Printf("\t\tDelete: case (c) & (d)\n")
         y = t.getMinimum(z.right)
+        logger.Printf("\t\t\tminimum of z.right is %s (color=%s)\n", y, y.color)
         yOriginalColor = y.color
         x = y.right
+        logger.Printf("\t\t\t--- x is right of minimum")
 
         if y.parent == z {
-            x.parent = y
+            if x != nil {
+                x.parent = y
+            }
         } else {
             t.transplant(y, y.right)
             y.right = z.right
@@ -474,9 +483,101 @@ func (t *Tree) Delete(key int) {
         y.color = z.color
     }
     if yOriginalColor == BLACK {
-        // @TODO ...
-        logger.Printf("Delete: fixup %s\n", x)
+        t.fixupDelete(x)
     }
+}
+
+func (t *Tree) fixupDelete(x *Node) {
+    logger.Printf("\t\t\tfixupDelete of node %s\n", x)
+    if x == nil {
+        return
+    }
+loop:
+    for {
+        switch {
+        case x == t.root:
+            logger.Printf("\t\t\t=> bye .. is root\n")
+            break loop
+        case x.color == RED:
+            logger.Printf("\t\t\t=> bye .. RED\n")
+            break loop
+        case x == x.parent.right:
+            logger.Printf("\t\tBRANCH: x is right child of parent\n")
+            w := x.parent.left // is nillable
+            if isRed(w) {
+                // Convert case 1 into case 2, 3, or 4
+                logger.Printf("\t\t\tR> case 1\n")
+                w.color = BLACK
+                x.parent.color = RED
+                t.RotateRight(x.parent)
+                w = x.parent.left
+            }
+            if w != nil {
+                switch {
+                case !isRed(w.left) && !isRed(w.right):
+                    // case 2 - both children of w are BLACK
+                    logger.Printf("\t\t\tR> case 2\n")
+                    w.color = RED
+                    x = x.parent // recurse up tree
+                case isRed(w.right) && !isRed(w.left):
+                    // case 3 - right child RED & left child BLACK
+                    // convert to case 4
+                    logger.Printf("\t\t\tR> case 3\n")
+                    w.right.color = BLACK
+                    w.color = RED
+                    t.RotateLeft(w)
+                    w = x.parent.left
+                }
+                if isRed(w.left) {
+                    // case 4 - left child is RED
+                    logger.Printf("\t\t\tR> case 4\n")
+                    w.color = x.parent.color
+                    x.parent.color = BLACK
+                    w.left.color = BLACK
+                    t.RotateRight(x.parent)
+                    x = t.root
+                }
+            }
+        case x == x.parent.left:
+            logger.Printf("\t\tBRANCH: x is left child of parent\n")
+            w := x.parent.right // is nillable
+            if isRed(w) {
+                // Convert case 1 into case 2, 3, or 4
+                logger.Printf("\t\t\tL> case 1\n")
+                w.color = BLACK
+                x.parent.color = RED
+                t.RotateLeft(x.parent)
+                w = x.parent.right
+            }
+            if w != nil {
+                switch {
+                case !isRed(w.left) && !isRed(w.right):
+                    // case 2 - both children of w are BLACK
+                    logger.Printf("\t\t\tL> case 2\n")
+                    w.color = RED
+                    x = x.parent // recurse up tree
+                case isRed(w.left) && !isRed(w.right):
+                    // case 3 - left child RED & right child BLACK
+                    // convert to case 4
+                    logger.Printf("\t\t\tL> case 3\n")
+                    w.left.color = BLACK
+                    w.color = RED
+                    t.RotateRight(w)
+                    w = x.parent.right
+                }
+                if isRed(w.right) {
+                    // case 4 - right child is RED
+                    logger.Printf("\t\t\tL> case 4\n")
+                    w.color = x.parent.color
+                    x.parent.color = BLACK
+                    w.right.color = BLACK
+                    t.RotateLeft(x.parent)
+                    x = t.root
+                }
+            }
+        }
+    }
+    x.color = BLACK
 }
 
 // Walk accepts a Visitor

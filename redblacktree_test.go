@@ -28,7 +28,7 @@ var funcs map[string]reflect.Method
 
 func init() {
     var found bool
-    var put, get, rotateLeft, rotateRight reflect.Method
+    var put, get, del, rotateLeft, rotateRight reflect.Method
 
     t := reflect.TypeOf(NewTree())
     put, found = t.MethodByName("Put")
@@ -38,6 +38,10 @@ func init() {
     get, found = t.MethodByName("Get")
     if !found {
         panic("No method `Get` in Tree")
+    }
+    del, found = t.MethodByName("Delete")
+    if !found {
+        panic("No method `Delete` in Tree")
     }
     rotateLeft, found = t.MethodByName("RotateLeft")
     if !found {
@@ -53,6 +57,7 @@ func init() {
         "rotateLeft":  rotateLeft,
         "put":         put,
         "get":         get,
+        "delete":      del,
     }
 
     TraceOff()
@@ -86,6 +91,12 @@ func assertNodeKey(n *Node, expected int, t *testing.T) {
 func assertPayloadString(expected string, actual string, t *testing.T) {
     if actual != expected {
         t.Errorf("Expected (%#v) got (%#v)", expected, actual)
+    }
+}
+
+func assertNodeColor(expected Color, actual Color, t *testing.T) {
+    if actual != expected {
+        t.Errorf("Expected color (%s) got (%s)", expected, actual)
     }
 }
 
@@ -535,7 +546,6 @@ func TestIsRed(t *testing.T) {
     }
 }
 
-// @TODO add deletes to the mix
 var fixtureSize = []struct {
     ops      string
     kv       KV
@@ -612,7 +622,7 @@ func TestMinimum(t *testing.T) {
     assertPayloadString("payload1", node.payload.(string), t)
 }
 
-func TestDelete(t *testing.T) {
+func TestDelete1(t *testing.T) {
     t1 := NewTree()
     t1.Delete(1)
 
@@ -623,7 +633,6 @@ func TestDelete(t *testing.T) {
             method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
         }
     }
-    // @TODO more stuff & change to table-driven test fixtures
     assertNodeKey(t1.root, 6, t)
     assertEqualTree(t1, t, "((((.1.)2(.3.))4(.5.))6((.7.)8(.9.)))")
     t1.Delete(6) // delete the root
@@ -631,4 +640,104 @@ func TestDelete(t *testing.T) {
     assertEqualTree(t1, t, "((((.1.)2(.3.))4(.5.))7(.8(.9.)))")
     t1.Delete(8) // delete case (a)
     assertEqualTree(t1, t, "((((.1.)2(.3.))4(.5.))7(.9.))")
+}
+
+var fixtureDeletionsSimple = []struct {
+    ops      string
+    kv       KV
+    expected string
+    size     int
+}{
+    {"delete",    KV{7, ""},           ".", 0},
+    {"put",       KV{7, "payload7"},   "(.7.)", 1},
+    {"delete",    KV{7, ""},           ".", 0},
+    {"put",       KV{7, "payload7"},   "(.7.)", 1},
+    {"put",       KV{5, "payload5"},   "((.5.)7.)", 2},
+    {"delete",    KV{7, ""},           "(.5.)", 1},
+    {"rootBlack", KV{5, ""},           "(.5.)", 1},
+    {"put",       KV{7, "payload7"},   "(.5(.7.))", 2},
+    {"delete",    KV{5, ""},           "(.7.)", 1},
+    {"put",       KV{5, "payload5"},   "((.5.)7.)", 2},
+    {"put",       KV{10,"payload10"},  "((.5.)7(.10.))", 3},
+    {"delete",    KV{7, ""},           "((.5.)10.)", 2},
+    {"put",       KV{7, "payload7"},   "((.5.)7(.10.))", 3},
+    {"delete",    KV{5, ""},           "(.7(.10.))", 2},
+    {"rootBlack", KV{7, ""},           "(.7(.10.))", 2},
+    {"put",       KV{5, "payload5"},   "((.5.)7(.10.))", 3},
+    {"delete",    KV{10,""},           "((.5.)7.)", 2},
+    {"put",       KV{10,"payload10"},  "((.5.)7(.10.))", 3},
+    {"put",       KV{2, "payload2"},   "(((.2.)5.)7(.10.))", 4},
+    {"put",       KV{6, "payload6"},   "(((.2.)5(.6.))7(.10.))", 5},
+    {"delete",    KV{6, ""},           "(((.2.)5.)7(.10.))", 4},
+    {"put",       KV{6, "payload6"},   "(((.2.)5(.6.))7(.10.))", 5},
+    {"delete",    KV{2, ""},           "((.5(.6.))7(.10.))", 4},
+    {"put",       KV{2, "payload2"},   "(((.2.)5(.6.))7(.10.))", 5},
+    {"delete",    KV{5, ""},           "(((.2.)6.)7(.10.))", 4},
+    {"rootBlack", KV{7, ""},           "(((.2.)6.)7(.10.))", 4},
+    {"delete",    KV{2, ""},           "((.6.)7(.10.))", 3},
+    {"put",       KV{8, "payload8"},   "((.6.)7((.8.)10.))", 4},
+    {"put",       KV{20,"payload20"},  "((.6.)7((.8.)10(.20.)))", 5},
+    {"put",       KV{15,"payload15"},  "((.6.)7((.8.)10((.15.)20.)))", 6},
+    {"put",       KV{25,"payload25"},  "((.6.)7((.8.)10((.15.)20(.25.))))", 7},
+    {"rootBlack", KV{7, ""},           "((.6.)7((.8.)10((.15.)20(.25.))))", 7},
+    {"delete",    KV{20,""},           "((.6.)7((.8.)10((.15.)25.)))", 6},
+    {"put",       KV{12,"payload12"},  "((.6.)7((.8.)10((.12.)15(.25.))))", 7},
+    {"put",       KV{13,"payload13"},  "(((.6.)7(.8.))10((.12(.13.))15(.25.)))", 8},
+    {"delete",    KV{10,""},           "(((.6.)7(.8.))12((.13.)15(.25.)))", 7},
+}
+
+func TestDeleteSimple(t *testing.T) {
+    t1 := NewTree()
+
+    for _, tt := range fixtureDeletionsSimple {
+        switch {
+        case tt.ops == "delete":
+            method := funcs[tt.ops]
+            method.Func.Call(ToArgs(t1, tt.kv.key))
+        case tt.ops == "put":
+            method := funcs[tt.ops]
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
+        case tt.ops == "rootBlack":
+            assertNodeColor(BLACK, t1.root.color, t)
+            assertNodeKey(t1.root, tt.kv.key, t)
+        }
+        assertEqualTree(t1, t, tt.expected)
+        assertEqual(uint64(tt.size), t1.Size(), t)
+    }
+}
+
+// @TODO ignored for NOW - idea: randomize the keys & create a huge tree 
+var fixtureDeletions = []struct {
+    ops      string
+    kv       KV
+    expected string
+    size     int
+}{
+    {"put", KV{7, "payload7"}, "(.7.)", 1},
+    {"put", KV{5, "payload5"}, "((.5.)7.)", 2},
+    {"delete", KV{7, ""}, "(.)", 1},
+    {"put", KV{7, "payload7"}, "(.7.)", 2},
+    {"put", KV{3, "payload3"}, "((.3.)5(.7.))", 3},
+    {"put", KV{6, "payload6"}, "((.3.)5((.6.)7.))", 4},
+    {"delete", KV{7, ""}, "(.)", 3},
+    {"put", KV{10, "payload10"}, "((.3.)5((.6.)7(.10.)))", 5},
+    {"put", KV{8, "payload8"}, "((.3.)5((.6.)7((.8.)10.)))", 6},
+    {"put", KV{12, "payload12"}, "((.3.)5((.6.)7((.8.)10(.12.))))", 7},
+}
+
+// @TODO ignored for NOW
+func IgnoreTestDelete2(t *testing.T) {
+    t1 := NewTree()
+
+    for _, tt := range fixtureDeletions {
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(t1, tt.kv.key, tt.kv.arg))
+            assertEqualTree(t1, t, tt.expected)
+        case tt.ops == "delete":
+            method.Func.Call(ToArgs(t1, tt.kv.key))
+        }
+        assertEqual(uint64(tt.size), t1.Size(), t)
+    }
 }
