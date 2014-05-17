@@ -17,10 +17,18 @@ func main() {
     t.Put(7, "payload7")
     t.Put(3, "payload3")
     t.Put(1, "payload1")
-    fmt.Printf("size = %d\n", t.Size())
+    fmt.Printf("size = %d\n", t.Size()) // size = 3
+
+    inorder := &rbt.InorderVisitor{}; t.Walk(inorder)
+    fmt.Printf("tree = %s\n", inorder) // tree = ((.1.)3(.7.))
+
     if ok, payload := t.Get(3); ok {
         fmt.Printf("%d is mapped to %s\n", 3, payload.(string))
     }
+
+    fmt.Printf("t.Has(1) = %t\n", t.Has(1)) // true
+    t.Delete(1)
+    fmt.Printf("t.Has(1) = %t\n", t.Has(1)) // false
 }
 ```
 
