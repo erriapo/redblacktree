@@ -107,9 +107,28 @@ type Visitable interface {
     Walk(Visitor)
 }
 
+// Keys must be comparable. It's mandatory to provide a Comparator,
+// which returns zero if o1 == o2, -1 if o1 < o2, 1 if o1 > o2
+type Comparator func(o1, o2 interface{}) int
+
+// Default comparator expects keys to be of type `int`.
+// Constraint: if either one of `o1` or `o2` cannot be asserted to `int`, it panics.
+func IntComparator(o1, o2 interface{}) int {
+    i1 := o1.(int); i2 := o2.(int)
+    switch {
+    case i1 > i2:
+        return 1
+    case i1 < i2:
+        return -1
+    default:
+        return 0
+    }
+}
+
 // Tree encapsulates the data structure.
 type Tree struct {
     root *Node
+    cmp Comparator
 }
 
 // `lock` protects `logger`
@@ -138,9 +157,14 @@ func SetOutput(w io.Writer) {
     logger = log.New(w, "", log.LstdFlags)
 }
 
-// NewTree returns an empty Tree
+// NewTree returns an empty Tree with default comparator `IntComparator`.
 func NewTree() *Tree {
-    return &Tree{root: nil}
+    return &Tree{root: nil, cmp: IntComparator}
+}
+
+// NewTreeWith returns an empty Tree with a supplied `Comparator`.
+func NewTreeWith(c Comparator) *Tree {
+    return &Tree{root: nil, cmp: c}
 }
 
 // Get looks for the node with supplied key and returns its mapped payload

@@ -60,8 +60,8 @@ func init() {
         "delete":      del,
     }
 
-    TraceOff()
-    //TraceOn()
+    //TraceOff()
+    TraceOn()
 }
 
 func True(b bool, t *testing.T) {
@@ -739,5 +739,23 @@ func IgnoreTestDelete2(t *testing.T) {
             method.Func.Call(ToArgs(t1, tt.kv.key))
         }
         assertEqual(uint64(tt.size), t1.Size(), t)
+    }
+}
+
+var fixtureComparator = []struct {
+    op1, op2 int
+    expected int
+}{
+    {0, 0, 0},
+    {0, 1, -1},
+    {1, 0, 1},
+    {-2, -2, 0},
+    {-2, -1, -1},
+    {-1, -2, 1},
+}
+
+func TestIntComparator(t *testing.T) {
+    for _, tt := range fixtureComparator {
+        assertEqual(uint64(IntComparator(tt.op1, tt.op2)), uint64(tt.expected), t)
     }
 }
