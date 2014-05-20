@@ -19,6 +19,7 @@ package redblacktree
 
 import (
     _ "fmt"
+    "bytes"
     "reflect"
     "sort"
     "testing"
@@ -60,8 +61,8 @@ func init() {
         "delete":      del,
     }
 
-    //TraceOff()
-    TraceOn()
+    TraceOff()
+    //TraceOn()
 }
 
 func True(b bool, t *testing.T) {
@@ -83,8 +84,8 @@ func assertDirection(expected Direction, actual Direction, t *testing.T) {
 }
 
 func assertNodeKey(n *Node, expected int, t *testing.T) {
-    if n.value != expected {
-        t.Errorf("Expected (%#v) got (%#v)", expected, n.value)
+    if n.key != expected {
+        t.Errorf("Expected (%#v) got (%#v)", expected, n.key)
     }
 }
 
@@ -141,9 +142,9 @@ func Nil(a interface{}, t *testing.T) {
     if a == nil {
         return
     }
-    value := reflect.ValueOf(a)
-    if nillable(value.Kind()) {
-        if !value.IsNil() {
+    key := reflect.ValueOf(a)
+    if nillable(key.Kind()) {
+        if !key.IsNil() {
             t.Errorf("%#v is not nil", a)
         }
     } else {
@@ -157,9 +158,9 @@ func NotNil(a interface{}, t *testing.T) {
         t.Errorf("Expected NOT nil")
         return
     }
-    value := reflect.ValueOf(a)
-    if nillable(value.Kind()) {
-        if value.IsNil() {
+    key := reflect.ValueOf(a)
+    if nillable(key.Kind()) {
+        if key.IsNil() {
             t.Errorf("%#v is nil but we expected it to be NOT nil", a)
         }
     }
@@ -342,7 +343,7 @@ func TestRedBlackParentLookup(t *testing.T) {
     found, parent, dir = tr.GetParent(key3)
     True(found, t)
     NotNil(parent, t)
-    if parent.value != key7 {
+    if parent.key != key7 {
         t.Errorf("Expected root node 7")
     }
     assertDirection(LEFT, dir, t)
@@ -350,7 +351,7 @@ func TestRedBlackParentLookup(t *testing.T) {
     found, parent, dir = tr.GetParent(key11)
     True(found, t)
     NotNil(parent, t)
-    if parent.value != key7 {
+    if parent.key != key7 {
         t.Errorf("Expected root node 7")
     }
     assertDirection(RIGHT, dir, t)
@@ -757,5 +758,83 @@ var fixtureComparator = []struct {
 func TestIntComparator(t *testing.T) {
     for _, tt := range fixtureComparator {
         assertEqual(uint64(IntComparator(tt.op1, tt.op2)), uint64(tt.expected), t)
+    }
+}
+
+func StringComparator(o1, o2 interface{}) int {
+    s1 := o1.(string); s2 := o2.(string)
+    return bytes.Compare([]byte(s1), []byte(s2))
+}
+
+var fixtureComparatorString = []struct {
+    op1, op2 string
+    expected int
+}{
+    {"", "", 0},
+    {"a", "b", -1},
+    {"b", "a", 1},
+    {"B", "b", -1},
+    {"b", "B", 1},
+}
+
+func TestStringComparator(t *testing.T) {
+    for _, tt := range fixtureComparatorString {
+        assertEqual(uint64(StringComparator(tt.op1, tt.op2)), uint64(tt.expected), t)
+    }
+}
+
+var fixtureStringKeys = []struct {
+    ops      string
+    key      string
+    arg      int
+    size     int
+}{
+    {"put",    "au", 61, 1},
+    {"put",    "my", 62, 2},
+    {"delete", "my", 0,  1},
+    {"put",    "fr", 63, 2},
+}
+
+func TestStringKey(t *testing.T) {
+    tr := NewTreeWith(StringComparator)
+    for _, tt := range fixtureStringKeys {
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(tr, tt.key, tt.arg))
+        case tt.ops == "delete":
+            method.Func.Call(ToArgs(tr, tt.key))
+        }
+        assertEqual(uint64(tt.size), tr.Size(), t)
+    }
+
+    True(tr.Has("au"), t)
+    True(tr.Has("fr"), t)
+    False(tr.Has("my"), t)
+
+    ok, payloadFr := tr.Get("fr")
+    True(ok, t)
+    True(payloadFr.(int) == 63, t)
+}
+
+type A struct {}
+
+func TestValidKeyCheck(t *testing.T) {
+    // nils not allowed as key
+    err1 := mustBeValidKey(nil)
+    if err1 != ErrorKeyIsNil {
+        t.Errorf("Expected %#v got %#v", ErrorKeyIsNil, err1)
+    }
+
+    var a *A
+    err1 = mustBeValidKey(a)
+    if err1 != ErrorKeyDisallowed {
+        t.Errorf("Expected %#v got %#v", ErrorKeyDisallowed, err1)
+    }
+
+    // function type cannot be a key
+    err2 := mustBeValidKey(StringComparator)
+    if err2 != ErrorKeyDisallowed {
+        t.Errorf("Expected %#v got %#v", ErrorKeyDisallowed, err2)
     }
 }

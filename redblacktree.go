@@ -23,6 +23,7 @@ package redblacktree
 
 import (
     "bytes"
+    "errors"
     "fmt"
     "io"
     "io/ioutil"
@@ -74,7 +75,7 @@ const (
 // (ii) Who is my grandparent node ?
 // The zero value for Node has color Red.
 type Node struct {
-    value  int // @TODO rename to key ?? Change type to interface{}
+    key     interface{}
     payload interface{}
     color  Color
     left   *Node
@@ -83,7 +84,7 @@ type Node struct {
 }
 
 func (n *Node) String() string {
-    return fmt.Sprintf("(%#v : %s)", n.value, n.Color())
+    return fmt.Sprintf("(%#v : %s)", n.key, n.Color())
 }
 
 func (n *Node) Parent() *Node {
@@ -112,7 +113,7 @@ type Visitable interface {
 type Comparator func(o1, o2 interface{}) int
 
 // Default comparator expects keys to be of type `int`.
-// Constraint: if either one of `o1` or `o2` cannot be asserted to `int`, it panics.
+// Warning: if either one of `o1` or `o2` cannot be asserted to `int`, it panics.
 func IntComparator(o1, o2 interface{}) int {
     i1 := o1.(int); i2 := o2.(int)
     switch {
@@ -158,6 +159,7 @@ func SetOutput(w io.Writer) {
 }
 
 // NewTree returns an empty Tree with default comparator `IntComparator`.
+// `IntComparator` expects keys to be type-assertable to `int`.
 func NewTree() *Tree {
     return &Tree{root: nil, cmp: IntComparator}
 }
@@ -167,8 +169,14 @@ func NewTreeWith(c Comparator) *Tree {
     return &Tree{root: nil, cmp: c}
 }
 
-// Get looks for the node with supplied key and returns its mapped payload
-func (t *Tree) Get(key int) (bool, interface{}) {
+// Get looks for the node with supplied key and returns its mapped payload.
+// Return value in 1st position indicates whether any payload was found.
+func (t *Tree) Get(key interface{}) (bool, interface{}) {
+    if err := mustBeValidKey(key); err != nil {
+        logger.Printf("Get was prematurely aborted: %s\n", err.Error())
+        return false, nil
+    }
+
     ok, node := t.getNode(key)
     if ok {
         return true, node.payload
@@ -177,7 +185,7 @@ func (t *Tree) Get(key int) (bool, interface{}) {
     }
 }
 
-func (t *Tree) getNode(key int) (bool, *Node) {
+func (t *Tree) getNode(key interface{}) (bool, *Node) {
     found, parent, dir := t.GetParent(key)
     if found {
         if parent == nil {
@@ -212,7 +220,12 @@ func (t *Tree) getMinimum(x *Node) *Node {
 }
 
 // GetParent looks for the node with supplied key and returns the parent node.
-func (t *Tree) GetParent(key int) (found bool, parent *Node, dir Direction) {
+func (t *Tree) GetParent(key interface{}) (found bool, parent *Node, dir Direction) {
+    if err := mustBeValidKey(key); err != nil {
+        logger.Printf("GetParent was prematurely aborted: %s\n", err.Error())
+        return false, nil, NODIR
+    }
+
     if t.root == nil {
         return false, nil, NODIR
     }
@@ -220,15 +233,15 @@ func (t *Tree) GetParent(key int) (found bool, parent *Node, dir Direction) {
     return t.internalLookup(nil, t.root, key, NODIR)
 }
 
-func (t *Tree) internalLookup(parent *Node, this *Node, key int, dir Direction) (bool, *Node, Direction) {
+func (t *Tree) internalLookup(parent *Node, this *Node, key interface{}, dir Direction) (bool, *Node, Direction) {
     switch {
     case this == nil:
         return false, parent, dir
-    case this.value == key:
+    case t.cmp(key, this.key) == 0:
         return true, parent, dir
-    case key < this.value:
+    case t.cmp(key, this.key) < 0:
         return t.internalLookup(this, this.left, key, LEFT)
-    case key > this.value:
+    case t.cmp(key, this.key) > 0:
         return t.internalLookup(this, this.right, key, RIGHT)
     default:
         return false, parent, NODIR
@@ -298,12 +311,17 @@ func (t *Tree) RotateLeft(x *Node) {
 
 // Put saves the mapping (key, data) into the tree.
 // If a mapping identified by `key` already exists, it is overwritten.
-// Constraint: keys cannot be nil & will cause a panic.
-func (t *Tree) Put(key int, data interface{}) {
+// Constraint: Not everything can be a key.
+func (t *Tree) Put(key interface{}, data interface{}) error {
+    if err := mustBeValidKey(key); err != nil {
+        logger.Printf("Put was prematurely aborted: %s\n", err.Error())
+        return err
+    }
+
     if t.root == nil {
-        t.root = &Node{value: key, color: BLACK}
+        t.root = &Node{key: key, color: BLACK}
         logger.Printf("Added %s as root node\n", t.root.String())
-        return
+        return nil
     }
 
     found, parent, dir := t.internalLookup(nil, t.root, key, NODIR)
@@ -323,7 +341,7 @@ func (t *Tree) Put(key int, data interface{}) {
 
     } else {
         if parent != nil {
-            newNode := &Node{value: key, parent: parent, payload: data}
+            newNode := &Node{key: key, parent: parent, payload: data}
             switch dir {
             case LEFT:
                 parent.left = newNode
@@ -334,11 +352,12 @@ func (t *Tree) Put(key int, data interface{}) {
             t.fixupPut(newNode)
         }
     }
+    return nil
 }
 
 func isRed(n *Node) bool {
-    value := reflect.ValueOf(n)
-    if value.IsNil() {
+    key := reflect.ValueOf(n)
+    if key.IsNil() {
         return false
     } else {
         return n.color == RED
@@ -438,7 +457,11 @@ func (t *Tree) Size() uint64 {
 }
 
 // Has checks for existence of a item identified by supplied key.
-func (t *Tree) Has(key int) bool {
+func (t *Tree) Has(key interface{}) bool {
+    if err := mustBeValidKey(key); err != nil {
+        logger.Printf("Has was prematurely aborted: %s\n", err.Error())
+        return false
+    }
     found, _, _ := t.internalLookup(nil, t.root, key, NODIR)
     return found
 }
@@ -458,7 +481,7 @@ func (t *Tree) transplant(u *Node, v *Node) {
 
 // Delete removes the item identified by the supplied key.
 // Delete is a noop if the supplied key doesn't exist.
-func (t *Tree) Delete(key int) {
+func (t *Tree) Delete(key interface{}) {
     if !t.Has(key) {
         logger.Printf("Delete: bail as no node exists for key %d\n", key)
         return
@@ -654,17 +677,49 @@ func (v *InorderVisitor) Visit(node *Node) {
     }
     v.buffer.Write([]byte("("))
     v.Visit(node.left)
-    v.buffer.Write([]byte(fmt.Sprintf("%d", node.value)))
-    //v.buffer.Write([]byte(fmt.Sprintf("%d{%s}", node.value, v.trim(node.color.String()))))
+    v.buffer.Write([]byte(fmt.Sprintf("%d", node.key))) // @TODO
+    //v.buffer.Write([]byte(fmt.Sprintf("%d{%s}", node.key, v.trim(node.color.String()))))
     v.Visit(node.right)
     v.buffer.Write([]byte(")"))
 }
 
+var (
+    ErrorKeyIsNil = errors.New("The literal nil not allowed as keys")
+    ErrorKeyDisallowed = errors.New("Disallowed key type")
+)
+
+// Allowed key types are: Boolean, Integer, Floating point, Complex, String values
+// And structs containing these. 
+// @TODO Should pointer type be allowed ?
+func mustBeValidKey(key interface{}) error {
+    if key == nil {
+        return ErrorKeyIsNil
+    }
+
+    keyValue := reflect.ValueOf(key)
+    switch keyValue.Kind() {
+    case reflect.Chan:
+        fallthrough
+    case reflect.Func:
+        fallthrough
+    case reflect.Interface:
+        fallthrough
+    case reflect.Map:
+        fallthrough
+    case reflect.Ptr:
+        fallthrough
+    case reflect.Slice:
+        return ErrorKeyDisallowed
+    default:
+        return nil
+    }
+}
+
 func main() {
     // example manual tree construction
-    node1 := Node{value: 10, left: &Node{value: 8}, right: &Node{value: 11}}
-    node2 := Node{value: 22, right: &Node{value: 26}}
-    tree := Tree{root: &Node{value: 7, left: &Node{value: 3}, right: &Node{value: 18, left: &node1, right: &node2}}}
+    node1 := Node{key: 10, left: &Node{key: 8}, right: &Node{key: 11}}
+    node2 := Node{key: 22, right: &Node{key: 26}}
+    tree := Tree{root: &Node{key: 7, left: &Node{key: 3}, right: &Node{key: 18, left: &node1, right: &node2}}}
     visitor := &InorderVisitor{}
     tree.Walk(visitor)
 }
