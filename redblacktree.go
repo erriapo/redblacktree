@@ -126,10 +126,17 @@ func IntComparator(o1, o2 interface{}) int {
     }
 }
 
+// Keys of type `string`.
+// Warning: if either one of `o1` or `o2` cannot be asserted to `string`, it panics.
+func StringComparator(o1, o2 interface{}) int {
+    s1 := o1.(string); s2 := o2.(string)
+    return bytes.Compare([]byte(s1), []byte(s2))
+}
+
 // Tree encapsulates the data structure.
 type Tree struct {
-    root *Node
-    cmp Comparator
+    root *Node     // tip of the tree
+    cmp Comparator // required function to order keys
 }
 
 // `lock` protects `logger`
@@ -319,7 +326,7 @@ func (t *Tree) Put(key interface{}, data interface{}) error {
     }
 
     if t.root == nil {
-        t.root = &Node{key: key, color: BLACK}
+        t.root = &Node{key: key, color: BLACK, payload: data}
         logger.Printf("Added %s as root node\n", t.root.String())
         return nil
     }
@@ -717,9 +724,11 @@ func mustBeValidKey(key interface{}) error {
 
 func main() {
     // example manual tree construction
+    // @TODO empty payload in this example!!
     node1 := Node{key: 10, left: &Node{key: 8}, right: &Node{key: 11}}
     node2 := Node{key: 22, right: &Node{key: 26}}
-    tree := Tree{root: &Node{key: 7, left: &Node{key: 3}, right: &Node{key: 18, left: &node1, right: &node2}}}
+    tree := Tree{root: &Node{key: 7, left: &Node{key: 3}, right: &Node{key: 18, left: &node1, right: &node2}}, cmp: IntComparator}
+
     visitor := &InorderVisitor{}
     tree.Walk(visitor)
 }

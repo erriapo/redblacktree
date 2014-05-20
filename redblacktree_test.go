@@ -19,7 +19,6 @@ package redblacktree
 
 import (
     _ "fmt"
-    "bytes"
     "reflect"
     "sort"
     "testing"
@@ -554,6 +553,7 @@ var fixtureSize = []struct {
 }{
     {"1st", KV{}, 0},
     {"put", KV{7, "payload7"}, 1},
+    {"get", KV{7, "payload7"}, 1},
     {"put", KV{1, "payload1"}, 2},
     {"get", KV{1, "payload1"}, 2},
     {"put", KV{9, "payload9"}, 3},
@@ -761,11 +761,6 @@ func TestIntComparator(t *testing.T) {
     }
 }
 
-func StringComparator(o1, o2 interface{}) int {
-    s1 := o1.(string); s2 := o2.(string)
-    return bytes.Compare([]byte(s1), []byte(s2))
-}
-
 var fixtureComparatorString = []struct {
     op1, op2 string
     expected int
@@ -817,17 +812,25 @@ func TestStringKey(t *testing.T) {
     True(payloadFr.(int) == 63, t)
 }
 
-type A struct {}
+type Key struct {
+    Path, Country string
+}
+
+func KeyComparator(o1, o2 interface{}) int {
+    k1 := o1.(Key); k2 := o2.(Key)
+    return StringComparator(k1.Path + k1.Country, k2.Path + k2.Country)
+}
 
 func TestValidKeyCheck(t *testing.T) {
-    // nils not allowed as key
+    // nil literal not allowed
     err1 := mustBeValidKey(nil)
     if err1 != ErrorKeyIsNil {
         t.Errorf("Expected %#v got %#v", ErrorKeyIsNil, err1)
     }
 
-    var a *A
-    err1 = mustBeValidKey(a)
+    // nil pointer
+    var k *Key
+    err1 = mustBeValidKey(k)
     if err1 != ErrorKeyDisallowed {
         t.Errorf("Expected %#v got %#v", ErrorKeyDisallowed, err1)
     }
@@ -836,5 +839,35 @@ func TestValidKeyCheck(t *testing.T) {
     err2 := mustBeValidKey(StringComparator)
     if err2 != ErrorKeyDisallowed {
         t.Errorf("Expected %#v got %#v", ErrorKeyDisallowed, err2)
+    }
+}
+
+var fixtureKeys = []struct {
+    ops      string
+    key      Key
+    arg      string
+    size     int
+}{
+    {"put", Key{"/",    "au"}, "a", 1},
+    {"get", Key{"/",    "au"}, "a", 1},
+    {"put", Key{"/",    "au"}, "b", 1},
+    {"put", Key{"/tmp", "nz"}, "c", 2},
+    {"get", Key{"/tmp", "nz"}, "c", 2},
+    {"get", Key{"/",    "au"}, "b", 2},
+}
+
+func TestKeyComparator(t *testing.T) {
+    tr := NewTreeWith(KeyComparator)
+    for _, tt := range fixtureKeys {
+        method := funcs[tt.ops]
+        switch {
+        case tt.ops == "put":
+            method.Func.Call(ToArgs(tr, tt.key, tt.arg))
+        case tt.ops == "get":
+            result := method.Func.Call(ToArgs(tr, tt.key))
+            True(result[0].Bool(), t)
+            assertPayloadString(tt.arg, result[1].Interface().(string), t)
+        }
+        assertEqual(uint64(tt.size), tr.Size(), t)
     }
 }
