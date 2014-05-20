@@ -5,6 +5,16 @@ import (
     rbt "github.com/erriapo/redblacktree"
 )
 
+type Key struct {
+    Path, Country string
+}
+
+func KeyComparator(o1, o2 interface{}) int {
+    k1 := o1.(Key)
+    k2 := o2.(Key)
+    return rbt.StringComparator(k1.Path+k1.Country, k2.Path+k2.Country)
+}
+
 func main() {
     t := rbt.NewTree()
 
@@ -16,7 +26,8 @@ func main() {
 
     fmt.Printf("size = %d\n", t.Size()) // 3
 
-    inorder := &rbt.InorderVisitor{}; t.Walk(inorder)
+    inorder := &rbt.InorderVisitor{}
+    t.Walk(inorder)
     fmt.Printf("tree = %s\n", inorder) // tree = ((.1.)3(.7.))
 
     if ok, payload := t.Get(3); ok {
@@ -26,4 +37,13 @@ func main() {
 
     t.Delete(1)
     fmt.Printf("t.Has(1) = %t\n", t.Has(1)) // false
+
+    tr := rbt.NewTreeWith(KeyComparator)
+    kAU, kNZ := Key{"/", "au"}, Key{"/tmp", "nz"}
+    tr.Put(kAU, 999)
+    if ok, payload := tr.Get(kAU); ok {
+        fmt.Printf("%#v is mapped to %#v\n", kAU, payload)
+    }
+    tr.Put(kNZ, 666)
+    fmt.Printf("size = %d\n", tr.Size())
 }
