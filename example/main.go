@@ -18,39 +18,40 @@ func KeyComparator(o1, o2 interface{}) int {
 func main() {
     t := rbt.NewTree()
 
-    fmt.Printf("Starting with empty tree\n")
-    fmt.Printf("t.Has(7) = %t\n", t.Has(7)) // false
+    fmt.Printf("Starting with an empty tree\n")
+    fmt.Printf("\tt.Has(7) = %t\n", t.Has(7)) // false
 
     fmt.Printf("Add 3 nodes with keys 7, 3 and 1 in succession\n")
     t.Put(7, "payload7")
     t.Put(3, "payload3")
     t.Put(1, "payload1")
 
-    fmt.Printf("size = %d\n", t.Size()) // 3
+    fmt.Printf("\tsize = %d\n", t.Size()) // 3
 
     inorder := &rbt.InorderVisitor{}
     t.Walk(inorder)
-    fmt.Printf("tree = %s\n", inorder) // tree = ((.1.)3(.7.))
+    fmt.Printf("\ttree = %s\n", inorder) // tree = ((.1.)3(.7.))
 
     if ok, payload := t.Get(3); ok {
-        fmt.Printf("%d is mapped to %s\n", 3, payload.(string))
+        fmt.Printf("\t%d is mapped to %s\n", 3, payload.(string))
     }
-    fmt.Printf("t.Has(7) = %t\n", t.Has(7)) // true
+    fmt.Printf("\tt.Has(7) = %t\n", t.Has(7)) // true
 
     t.Delete(1)
     fmt.Printf("\nt.Delete(1)\n")
     inorder2 := &rbt.InorderVisitor{}
     t.Walk(inorder2)
-    fmt.Printf("tree = %s\n", inorder2) // tree = (.3(.7.))
-    fmt.Printf("t.Has(1) = %t\n\n", t.Has(1)) // false
+    fmt.Printf("\ttree = %s\n", inorder2) // tree = (.3(.7.))
+    fmt.Printf("\tt.Has(1) = %t\n\n", t.Has(1)) // false
 
     tr := rbt.NewTreeWith(KeyComparator)
     kAU, kNZ := Key{"/", "au"}, Key{"/tmp", "nz"}
     tr.Put(kAU, 999)
+    fmt.Printf("tr.Put(kAU, 999)\n")
     if ok, payload := tr.Get(kAU); ok {
-        fmt.Printf("%#v is mapped to %#v\n", kAU, payload)
+        fmt.Printf("\t%#v is mapped to %#v\n", kAU, payload)
     }
     tr.Put(kNZ, 666)
     fmt.Printf("tr.Put(kNZ, 666)\n")
-    fmt.Printf("size = %d\n", tr.Size())
+    fmt.Printf("\tsize = %d\n", tr.Size())
 }
