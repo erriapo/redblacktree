@@ -18,8 +18,10 @@ func KeyComparator(o1, o2 interface{}) int {
 func main() {
     t := rbt.NewTree()
 
+    fmt.Printf("Starting with empty tree\n")
     fmt.Printf("t.Has(7) = %t\n", t.Has(7)) // false
 
+    fmt.Printf("Add 3 nodes with keys 7, 3 and 1 in succession\n")
     t.Put(7, "payload7")
     t.Put(3, "payload3")
     t.Put(1, "payload1")
@@ -36,7 +38,11 @@ func main() {
     fmt.Printf("t.Has(7) = %t\n", t.Has(7)) // true
 
     t.Delete(1)
-    fmt.Printf("t.Has(1) = %t\n", t.Has(1)) // false
+    fmt.Printf("\nt.Delete(1)\n")
+    inorder2 := &rbt.InorderVisitor{}
+    t.Walk(inorder2)
+    fmt.Printf("tree = %s\n", inorder2) // tree = (.3(.7.))
+    fmt.Printf("t.Has(1) = %t\n\n", t.Has(1)) // false
 
     tr := rbt.NewTreeWith(KeyComparator)
     kAU, kNZ := Key{"/", "au"}, Key{"/tmp", "nz"}
@@ -45,5 +51,6 @@ func main() {
         fmt.Printf("%#v is mapped to %#v\n", kAU, payload)
     }
     tr.Put(kNZ, 666)
+    fmt.Printf("tr.Put(kNZ, 666)\n")
     fmt.Printf("size = %d\n", tr.Size())
 }
